@@ -1,5 +1,9 @@
 # FiddlerWillowLite
 
+[![CI](https://github.com/yaowenqiang/FiddlerWillowLite/actions/workflows/ci.yml/badge.svg)](https://github.com/yaowenqiang/FiddlerWillowLite/actions/workflows/ci.yml)
+[![Release](https://github.com/yaowenqiang/FiddlerWillowLite/actions/workflows/release.yml/badge.svg)](https://github.com/yaowenqiang/FiddlerWillowLite/actions/workflows/release.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+
 一个参考 Fiddler Willow 插件实现的 **Fiddler Classic** 扩展：以项目为单位管理 Host 映射规则，一键切换整套环境，并在独立标签页中查看抓包与过滤结果。
 
 > A lightweight Willow-like extension for Fiddler Classic: project-based host mapping with one-click environment switching, plus a built-in traffic capture and filter tab.
@@ -22,7 +26,9 @@
 
 ## 安装插件
 
-1. 获取 `FiddlerWillowLite.dll`（从 Releases 下载，或按下方步骤自行编译）。
+1. 获取 `FiddlerWillowLite.dll`：
+   - **推荐**：从 [Releases](https://github.com/yaowenqiang/FiddlerWillowLite/releases) 下载最新版本的 zip 压缩包（含 DLL、README 和 LICENSE），解压取用。
+   - 或按下方步骤自行编译。
 2. 复制到 Fiddler 的扩展目录：
 
    ```
@@ -111,6 +117,24 @@ msbuild FiddlerWillowLite.csproj /p:FiddlerExe="D:\path\Fiddler.exe"
 
 测试脚本会自动备份并还原 `%APPDATA%\FiddlerWillowLite\config.json`，不会污染真实配置。
 
+## CI 与自动发布
+
+仓库内置 GitHub Actions：
+
+- **CI**（`.github/workflows/ci.yml`）：push 到 `main`、PR 或手动触发时，在 `windows-latest` 上准备工具链、下载 Fiddler 引用、编译、`--test` 全套行为测试，并上传 DLL 构建产物。
+- **Release**（`.github/workflows/release.yml`）：推送 `v*` 标签时触发，从标签名写入程序集版本（`v0.1.0` → `0.1.0.0`），编译并测试通过后打包 `FiddlerWillowLite-<tag>.zip`，自动创建 GitHub Release 并生成更新说明。
+
+CI 环境与本机不同，没有预装 Fiddler Classic。`fetch_fiddler_ref.py` 会从 Telerik 官方地址下载安装包，提取内部的 `Fiddler.exe` 作为编译引用（不随仓库分发，避免授权问题）。本地如果已安装 Fiddler，`build.py` 会优先使用本机版本，无需运行该脚本。
+
+维护者发布新版本：
+
+```bash
+git tag v0.1.0
+git push origin v0.1.0
+```
+
+推送后 Release 工作流会自动完成编译、测试与发布。
+
 ## 诊断
 
 插件会在 `%TEMP%\FiddlerWillowLite-debug.log` 记录构造与 `OnLoad` 阶段的关键步骤。如果标签没有出现，先看这个日志，再看 Fiddler 的 **Log** 标签页。
@@ -130,6 +154,7 @@ FiddlerWillowLite/
 ├── bootstrap.py             # 工具链引导（首次构建前运行）
 ├── build.py                 # 一键编译 / 校验 / 安装
 ├── build.bat / build.sh     # 构建脚本包装
+├── fetch_fiddler_ref.py     # CI 用：下载并提取 Fiddler.exe 编译引用
 ├── FiddlerWillowLite.csproj # Visual Studio 工程
 ├── WillowPlugin.cs          # Fiddler 钩子与规则应用
 ├── WillowView.cs            # 选项卡 UI
@@ -138,6 +163,7 @@ FiddlerWillowLite/
 ├── EditDialog.cs            # 项目/规则编辑对话框
 ├── Properties/AssemblyInfo.cs
 ├── tests/                   # shim 与行为测试
+├── .github/workflows/       # CI 与 Release 工作流
 └── .toolchain/              # 本地工具链（gitignore，由 bootstrap.py 生成）
 ```
 
