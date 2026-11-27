@@ -87,6 +87,7 @@ namespace FiddlerWillowLite
             var tools = new ToolStrip { Dock = DockStyle.Top, GripStyle = ToolStripGripStyle.Hidden };
             tools.Items.Add(new ToolStripButton("新增项目", null, (sender, args) => AddProject()));
             tools.Items.Add(new ToolStripButton("新增 Host", null, (sender, args) => AddHost()));
+            tools.Items.Add(new ToolStripButton("批量添加", null, (sender, args) => AddHostsBulk()));
             tools.Items.Add(new ToolStripButton("编辑", null, (sender, args) => EditSelected()));
             tools.Items.Add(new ToolStripButton("删除", null, (sender, args) => DeleteSelected()));
             tools.Items.Add(new ToolStripSeparator());
@@ -297,6 +298,30 @@ namespace FiddlerWillowLite
                     Target = dialog.SecondValue,
                     Enabled = true
                 });
+                ReloadTree();
+                MarkDirty();
+            }
+        }
+
+        private void AddHostsBulk()
+        {
+            var project = SelectedProject(_tree.SelectedNode);
+            if (project == null)
+            {
+                MessageBox.Show(this, "请先选中一个项目，再批量添加 Host 规则。", "Willow Lite", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                return;
+            }
+
+            using (var dialog = new BulkHostDialog(project.Name, project.Rules))
+            {
+                if (dialog.ShowDialog(this) != DialogResult.OK || dialog.ParsedRules.Count == 0)
+                {
+                    return;
+                }
+                foreach (var rule in dialog.ParsedRules)
+                {
+                    project.Rules.Add(rule);
+                }
                 ReloadTree();
                 MarkDirty();
             }

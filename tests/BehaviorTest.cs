@@ -78,6 +78,33 @@ internal static class BehaviorTest
             File.Delete(configPath);
         }
 
+        // 批量解析：标准 hosts 格式、域名在前、箭头/等号分隔、注释与多域名。
+        var existing = new List<HostRule>
+        {
+            new HostRule { Domain = "skip.example.com", Target = "1.1.1.1", Enabled = true }
+        };
+        var bulk = HostRuleParser.Parse(
+            "# 注释行\n"
+            + "127.0.0.1  api.example.com  web.example.com\n"
+            + "dev.example.com 10.0.0.5:8080\n"
+            + "stage.example.com -> 10.0.0.6\n"
+            + "prod.example.com=10.0.0.7\n"
+            + "// 另一条注释\n"
+            + "skip.example.com 2.2.2.2\n", existing);
+        Check(bulk.Rules.Count == 5, "bulk parse: five valid rules");
+        Check(bulk.Rules[0].Domain == "api.example.com" && bulk.Rules[0].Target == "127.0.0.1",
+            "bulk parse: hosts format IP first");
+        Check(bulk.Rules[1].Domain == "web.example.com", "bulk parse: multiple domains per line");
+        Check(bulk.Rules[2].Target == "10.0.0.5:8080", "bulk parse: domain first with port");
+        Check(bulk.Rules[3].Domain == "stage.example.com" && bulk.Rules[3].Target == "10.0.0.6",
+            "bulk parse: arrow separator");
+        Check(bulk.Rules[4].Domain == "prod.example.com", "bulk parse: equals separator");
+        Check(bulk.Skipped == 3, "bulk parse: comments and blank lines skipped");
+        Check(bulk.Duplicates == 1, "bulk parse: duplicate domain skipped");
+
+        var invalid = HostRuleParser.Parse("bad domain 1.2.3.4\nexample.com not-an-ip\n", null);
+        Check(invalid.Errors.Count == 2 && invalid.Rules.Count == 0, "bulk parse: invalid lines reported");
+
         Console.WriteLine();
         Console.WriteLine("FAILURES: " + _failures);
         return _failures == 0 ? 0 : 1;

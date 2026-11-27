@@ -54,6 +54,8 @@
     <Compile Include="Models.cs" />
     <Compile Include="RuleStore.cs" />
     <Compile Include="EditDialog.cs" />
+    <Compile Include="HostRuleParser.cs" />
+    <Compile Include="BulkHostDialog.cs" />
     <Compile Include="WillowView.cs" />
     <Compile Include="WillowPlugin.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />

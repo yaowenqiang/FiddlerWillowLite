@@ -12,6 +12,7 @@
 
 - **项目 / 环境一键切换**：用树形结构管理项目，勾选项目即启用整套规则；多个项目启用时按自上而下第一个命中生效。
 - **Host 映射**：域名 → 指定 `IP` 或 `IP:端口`，支持 `*.example.com` 通配。通过 Fiddler 的 `x-overrideHost` 改写连接目标，不改 Host 请求头，并设置 `bypassGateway`。
+- **批量添加 Host**：粘贴多行文本一次导入大量规则，实时预览解析结果，自动跳过注释、空行和重复域名。兼容系统 hosts 文件格式与 `域名 -> 目标` 写法。
 - **抓包与过滤**：独立列表记录请求方法、域名、路径、状态码、耗时和命中项目；支持关键字过滤、仅看命中规则、暂停、清空，双击复制 URL。
 - **配置持久化**：自动保存到 `%APPDATA%\FiddlerWillowLite\config.json`，改动即时写入。
 - **无需 Visual Studio**：自带脚本化构建流程，一键编译、校验、安装。
@@ -49,9 +50,23 @@
    - 域名：`api.example.com`，目标：`127.0.0.1:8080`
    - 域名：`*.test.local`，目标：`10.0.0.5`
 4. 勾选项目节点即可启用该项目下的全部规则；取消勾选即关闭。
-5. 「启用 Host 映射」总开关可一键停用所有映射。
-6. 右侧抓包列表可按关键字过滤、只看命中规则，双击行复制完整 URL。
-7. 配置保存在 `%APPDATA%\FiddlerWillowLite\config.json`，可直接查看或备份。
+5. 需要一次导入多条规则时，选中项目后点 **批量添加**，粘贴文本并预览确认。支持以下写法（可混用）：
+
+   ```
+   # 系统 hosts 格式：目标在前，一行可跟多个域名
+   127.0.0.1  api.example.com  web.example.com
+   # 域名在前（可带端口）
+   dev.example.com 10.0.0.5:8080
+   # 箭头或等号分隔
+   stage.example.com -> 10.0.0.6
+   prod.example.com=10.0.0.7
+   # # 和 // 开头的行、空行会被忽略；与目标项目中重复的域名会跳过
+   ```
+
+   对话框下方实时显示「有效 / 重复跳过 / 错误 / 注释空行」统计，格式错误的行会列出原因且不会导入。
+7. 「启用 Host 映射」总开关可一键停用所有映射。
+8. 右侧抓包列表可按关键字过滤、只看命中规则，双击行复制完整 URL。
+9. 配置保存在 `%APPDATA%\FiddlerWillowLite\config.json`，可直接查看或备份。
 
 示例配置：
 
@@ -76,7 +91,7 @@
 
 ```bash
 python bootstrap.py        # 仅首次：从 NuGet 下载 Roslyn，复制 .NET Framework 引用
-python build.py --test     # 编译 → 反射校验 → 7 项行为测试 → 安装到 Fiddler Scripts
+python build.py --test     # 编译 → 反射校验 → 16 项行为测试 → 安装到 Fiddler Scripts
 ```
 
 其他常用命令：
@@ -105,15 +120,11 @@ msbuild FiddlerWillowLite.csproj /p:FiddlerExe="D:\path\Fiddler.exe"
 
 ## 测试
 
-`python build.py --test` 会在 shim 环境中运行 7 项行为测试，覆盖：
+`python build.py --test` 会在 shim 环境中运行 16 项行为测试，覆盖：
 
-- 精确域名映射写入 `x-overrideHost`
-- 命中后 `bypassGateway = true`
-- 会话列表自定义列写入项目名
-- `*.test.local` 通配符映射并自动补端口
-- 禁用规则不生效
-- 未命中域名不改写
-- 映射总开关关闭时不应用
+- 精确域名映射写入 `x-overrideHost`、命中后 `bypassGateway = true`、会话列表自定义列写入项目名
+- `*.test.local` 通配符映射并自动补端口、禁用规则不生效、未命中域名不改写、映射总开关关闭时不应用
+- 批量解析：hosts 格式、`一行多域名`、域名在前带端口、箭头/等号分隔、注释与空行跳过、重复域名跳过、无效行报错
 
 测试脚本会自动备份并还原 `%APPDATA%\FiddlerWillowLite\config.json`，不会污染真实配置。
 
@@ -158,6 +169,8 @@ FiddlerWillowLite/
 ├── FiddlerWillowLite.csproj # Visual Studio 工程
 ├── WillowPlugin.cs          # Fiddler 钩子与规则应用
 ├── WillowView.cs            # 选项卡 UI
+├── BulkHostDialog.cs        # 批量添加 Host 对话框与解析预览
+├── HostRuleParser.cs        # 多行文本批量解析（hosts / 箭头 / 等号格式）
 ├── Models.cs                # 数据模型
 ├── RuleStore.cs             # JSON 配置读写
 ├── EditDialog.cs            # 项目/规则编辑对话框

@@ -30,6 +30,8 @@ SOURCE_FILES = [
     "Models.cs",
     "RuleStore.cs",
     "EditDialog.cs",
+    "HostRuleParser.cs",
+    "BulkHostDialog.cs",
     "WillowView.cs",
     "WillowPlugin.cs",
     os.path.join("Properties", "AssemblyInfo.cs"),
