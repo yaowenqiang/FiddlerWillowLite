@@ -28,7 +28,7 @@ namespace FiddlerWillowLite
         private const int MaxShown = 500;
 
         private readonly WillowConfig _config;
-        private readonly TreeView _tree = new TreeView();
+        private readonly MultiSelectTree _tree = new MultiSelectTree();
         private readonly DataGridView _grid = new DataGridView();
         private readonly TextBox _filter = new TextBox();
         private readonly CheckBox _onlyMatched = new CheckBox { Text = "仅命中规则" };
@@ -90,8 +90,9 @@ namespace FiddlerWillowLite
             tools.Items.Add(new ToolStripButton("批量添加", null, (sender, args) => AddHostsBulk()));
             tools.Items.Add(new ToolStripButton("编辑", null, (sender, args) => EditSelected()));
             tools.Items.Add(new ToolStripButton("删除", null, (sender, args) => DeleteSelected()));
+            tools.Items.Add(new ToolStripButton("批量删除", null, (sender, args) => DeleteHostsBulk()));
             tools.Items.Add(new ToolStripSeparator());
-            tools.Items.Add(new ToolStripLabel("勾选项目即可切换整套环境"));
+            tools.Items.Add(new ToolStripLabel("勾选切换环境；Ctrl/Shift 多选后删除"));
             split.Panel1.Controls.Add(tools);
 
             var bottom = new Panel { Dock = DockStyle.Bottom, Height = 74 };
@@ -193,6 +194,7 @@ namespace FiddlerWillowLite
         private void ReloadTree()
         {
             _tree.BeginUpdate();
+            _tree.ClearSelection();
             _tree.Nodes.Clear();
             foreach (var project in _config.Projects)
             {
@@ -377,37 +379,98 @@ namespace FiddlerWillowLite
 
         private void DeleteSelected()
         {
-            var node = _tree.SelectedNode;
-            if (node == null)
+            var nodes = _tree.SelectedNodes;
+            if (nodes == null || nodes.Count == 0)
             {
                 return;
             }
 
-            var project = node.Tag as EnvProject;
-            if (project != null)
+            // 先收集项目，再收集规则；若规则所属项目也在选中列表中则不重复删除。
+            var projects = new List<EnvProject>();
+            foreach (TreeNode node in nodes)
             {
-                var answer = MessageBox.Show(this,
-                    "确定删除项目「" + project.Name + "」及其所有规则吗？",
-                    "Willow Lite", MessageBoxButtons.YesNo, MessageBoxIcon.Question);
-                if (answer != DialogResult.Yes)
+                var project = node.Tag as EnvProject;
+                if (project != null && !projects.Contains(project))
                 {
-                    return;
+                    projects.Add(project);
                 }
-                _config.Projects.Remove(project);
             }
-            else
+
+            var rules = new List<KeyValuePair<EnvProject, HostRule>>();
+            foreach (TreeNode node in nodes)
             {
                 var rule = node.Tag as HostRule;
-                var parentProject = SelectedProject(node);
-                if (rule == null || parentProject == null)
+                var parent = SelectedProject(node);
+                if (rule != null && parent != null && !projects.Contains(parent))
                 {
-                    return;
+                    rules.Add(new KeyValuePair<EnvProject, HostRule>(parent, rule));
                 }
-                parentProject.Rules.Remove(rule);
             }
+
+            var ruleCount = 0;
+            foreach (var project in projects)
+            {
+                ruleCount += project.Rules.Count;
+            }
+            ruleCount += rules.Count;
+            if (ruleCount == 0 && projects.Count == 0)
+            {
+                return;
+            }
+
+            var description = projects.Count > 0
+                ? string.Format("{0} 个项目（含 {1} 条规则）", projects.Count, ruleCount)
+                : string.Format("{0} 条规则", ruleCount);
+            var answer = MessageBox.Show(this,
+                "确定删除选中的 " + description + " 吗？此操作不可撤销。",
+                "Willow Lite", MessageBoxButtons.YesNo, MessageBoxIcon.Question);
+            if (answer != DialogResult.Yes)
+            {
+                return;
+            }
+
+            var removedRules = 0;
+            foreach (var pair in rules)
+            {
+                if (pair.Key.Rules.Remove(pair.Value))
+                {
+                    removedRules++;
+                }
+            }
+            var removedProjects = BulkDelete.RemoveProjects(_config, projects);
 
             ReloadTree();
             MarkDirty();
+            if (removedProjects > 0 || removedRules > 0)
+            {
+                MessageBox.Show(this,
+                    string.Format("已删除 {0} 个项目、{1} 条规则。", removedProjects, removedRules),
+                    "Willow Lite", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            }
+        }
+
+        private void DeleteHostsBulk()
+        {
+            var project = SelectedProject(_tree.SelectedNode);
+            using (var dialog = new BulkDeleteDialog(project == null ? null : project.Name, _config, project))
+            {
+                if (dialog.ShowDialog(this) != DialogResult.OK || dialog.Domains.Count == 0)
+                {
+                    return;
+                }
+
+                var scope = dialog.AllProjects ? null : project;
+                var result = BulkDelete.Remove(_config, dialog.Domains, scope);
+                ReloadTree();
+                MarkDirty();
+
+                var message = string.Format("已删除 {0} 条规则。", result.Removed.Count);
+                if (result.NotFound.Count > 0)
+                {
+                    message += string.Format("\n未找到 {0} 个域名。", result.NotFound.Count);
+                }
+                MessageBox.Show(this, message, "Willow Lite", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            }
         }
 
         private void MarkDirty()

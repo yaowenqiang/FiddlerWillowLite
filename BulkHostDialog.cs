@@ -14,6 +14,7 @@ namespace FiddlerWillowLite
         private readonly Label _summary = new Label();
         private readonly Button _ok = new Button { Text = "添加", DialogResult = DialogResult.OK, Width = 84 };
         private readonly Button _cancel = new Button { Text = "取消", DialogResult = DialogResult.Cancel, Width = 84 };
+        private readonly Panel _footer = new Panel { Dock = DockStyle.Bottom, Height = 46 };
         private readonly List<HostRule> _parsed = new List<HostRule>();
         private readonly IEnumerable<HostRule> _existing;
 
@@ -77,24 +78,31 @@ namespace FiddlerWillowLite
             inputPanel.Controls.Add(_input);
             Controls.Add(inputPanel);
 
-            var footer = new Panel { Dock = DockStyle.Bottom, Height = 46 };
             _summary.Left = 12;
             _summary.Top = 14;
             _summary.AutoSize = true;
-            _ok.Left = 500;
             _ok.Top = 9;
-            _ok.Anchor = AnchorStyles.Right | AnchorStyles.Top;
-            _cancel.Left = 590;
             _cancel.Top = 9;
-            _cancel.Anchor = AnchorStyles.Right | AnchorStyles.Top;
-            footer.Controls.Add(_summary);
-            footer.Controls.Add(_ok);
-            footer.Controls.Add(_cancel);
-            Controls.Add(footer);
+            _footer.Controls.Add(_summary);
+            _footer.Controls.Add(_ok);
+            _footer.Controls.Add(_cancel);
+            Controls.Add(_footer);
 
             AcceptButton = null;
             CancelButton = _cancel;
             RefreshPreview();
+        }
+
+        protected override void OnLoad(EventArgs e)
+        {
+            base.OnLoad(e);
+            // 构造阶段 footer 的实际宽度尚未确定，若在那时设置 Right 锚点，
+            // 按钮会被错误地定位到客户区之外。这里按真实宽度重新布局并锚定。
+            int right = _footer.ClientSize.Width;
+            _cancel.Left = right - _cancel.Width - 12;
+            _ok.Left = _cancel.Left - _ok.Width - 8;
+            _cancel.Anchor = AnchorStyles.Right | AnchorStyles.Top;
+            _ok.Anchor = AnchorStyles.Right | AnchorStyles.Top;
         }
 
         private void RefreshPreview()

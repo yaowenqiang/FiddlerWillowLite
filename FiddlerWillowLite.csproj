@@ -56,6 +56,9 @@
     <Compile Include="EditDialog.cs" />
     <Compile Include="HostRuleParser.cs" />
     <Compile Include="BulkHostDialog.cs" />
+    <Compile Include="BulkDelete.cs" />
+    <Compile Include="BulkDeleteDialog.cs" />
+    <Compile Include="MultiSelectTree.cs" />
     <Compile Include="WillowView.cs" />
     <Compile Include="WillowPlugin.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />

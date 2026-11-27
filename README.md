@@ -13,6 +13,7 @@
 - **项目 / 环境一键切换**：用树形结构管理项目，勾选项目即启用整套规则；多个项目启用时按自上而下第一个命中生效。
 - **Host 映射**：域名 → 指定 `IP` 或 `IP:端口`，支持 `*.example.com` 通配。通过 Fiddler 的 `x-overrideHost` 改写连接目标，不改 Host 请求头，并设置 `bypassGateway`。
 - **批量添加 Host**：粘贴多行文本一次导入大量规则，实时预览解析结果，自动跳过注释、空行和重复域名。兼容系统 hosts 文件格式与 `域名 -> 目标` 写法。
+- **批量删除**：`Ctrl/Shift` 多选项目/规则后一次删除；或点 **批量删除** 粘贴域名文本，预览命中规则后按「仅当前项目 / 全部项目」范围批量删除，支持 `*.example.com` 通配。
 - **抓包与过滤**：独立列表记录请求方法、域名、路径、状态码、耗时和命中项目；支持关键字过滤、仅看命中规则、暂停、清空，双击复制 URL。
 - **配置持久化**：自动保存到 `%APPDATA%\FiddlerWillowLite\config.json`，改动即时写入。
 - **无需 Visual Studio**：自带脚本化构建流程，一键编译、校验、安装。
@@ -64,6 +65,9 @@
    ```
 
    对话框下方实时显示「有效 / 重复跳过 / 错误 / 注释空行」统计，格式错误的行会列出原因且不会导入。
+6. 删除规则有两种方式：
+   - **多选删除**：在左侧树中按住 `Ctrl` 或 `Shift` 选中多个项目或规则，点 **删除** 一次删掉（选中的项目会连同其规则一起删除，不会重复计数）。
+   - **批量删除**：选中项目后点 **批量删除**，对话框会**自动填入当前项目的所有域名**（若当前项目为空则填入全部项目的域名），删掉不想删除的行即可；也可清空后粘贴自定义文本（同样支持 hosts 格式 / 箭头 / 等号 / 注释 / `*.` 通配）。实时预览命中的规则，选择「仅当前项目」或「全部项目」后确认。手动编辑过文本后切换范围不会覆盖你的输入。
 7. 「启用 Host 映射」总开关可一键停用所有映射。
 8. 右侧抓包列表可按关键字过滤、只看命中规则，双击行复制完整 URL。
 9. 配置保存在 `%APPDATA%\FiddlerWillowLite\config.json`，可直接查看或备份。
@@ -120,11 +124,12 @@ msbuild FiddlerWillowLite.csproj /p:FiddlerExe="D:\path\Fiddler.exe"
 
 ## 测试
 
-`python build.py --test` 会在 shim 环境中运行 16 项行为测试，覆盖：
+`python build.py --test` 会在 shim 环境中运行 27 项行为测试，覆盖：
 
 - 精确域名映射写入 `x-overrideHost`、命中后 `bypassGateway = true`、会话列表自定义列写入项目名
 - `*.test.local` 通配符映射并自动补端口、禁用规则不生效、未命中域名不改写、映射总开关关闭时不应用
 - 批量解析：hosts 格式、`一行多域名`、域名在前带端口、箭头/等号分隔、注释与空行跳过、重复域名跳过、无效行报错
+- 批量删除：域名提取（纯域名/hosts/箭头/等号/通配）、重复与注释跳过、精确与 `*.` 通配匹配、作用范围（当前项目/全部项目）、未命中与多项目删除
 
 测试脚本会自动备份并还原 `%APPDATA%\FiddlerWillowLite\config.json`，不会污染真实配置。
 
@@ -170,7 +175,10 @@ FiddlerWillowLite/
 ├── WillowPlugin.cs          # Fiddler 钩子与规则应用
 ├── WillowView.cs            # 选项卡 UI
 ├── BulkHostDialog.cs        # 批量添加 Host 对话框与解析预览
-├── HostRuleParser.cs        # 多行文本批量解析（hosts / 箭头 / 等号格式）
+├── HostRuleParser.cs        # 批量添加的多行文本解析（hosts / 箭头 / 等号格式）
+├── BulkDelete.cs            # 批量删除的域名解析、匹配与删除逻辑
+├── BulkDeleteDialog.cs      # 批量删除对话框与命中预览
+├── MultiSelectTree.cs       # 支持 Ctrl/Shift 多选的项目树
 ├── Models.cs                # 数据模型
 ├── RuleStore.cs             # JSON 配置读写
 ├── EditDialog.cs            # 项目/规则编辑对话框

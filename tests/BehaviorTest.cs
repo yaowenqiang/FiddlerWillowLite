@@ -105,6 +105,64 @@ internal static class BehaviorTest
         var invalid = HostRuleParser.Parse("bad domain 1.2.3.4\nexample.com not-an-ip\n", null);
         Check(invalid.Errors.Count == 2 && invalid.Rules.Count == 0, "bulk parse: invalid lines reported");
 
+        // 批量删除：域名提取（纯域名 / hosts 格式 / 箭头 / 等号 / 注释 / 去重）。
+        var delParse = BulkDelete.Parse(
+            "# 注释\n"
+            + "api.example.com\n"
+            + "127.0.0.1  web.example.com  cdn.example.com\n"
+            + "stage.example.com -> 10.0.0.6\n"
+            + "prod.example.com=10.0.0.7\n"
+            + "*.test.local\n"
+            + "api.example.com\n"
+            + "10.0.0.1 1.2.3.4\n");
+        Check(delParse.Domains.Count == 6, "bulk delete: six unique domains parsed");
+        Check(delParse.Domains[0] == "api.example.com" && delParse.Domains[3] == "stage.example.com",
+            "bulk delete: plain / arrow / equals domains");
+        Check(delParse.Domains[1] == "web.example.com" && delParse.Domains[2] == "cdn.example.com",
+            "bulk delete: hosts format multiple domains");
+        Check(delParse.Duplicates == 1, "bulk delete: duplicate domain skipped");
+        Check(delParse.Skipped == 2 && delParse.Errors.Count == 1, "bulk delete: comment/blank skipped and IP-only line reported invalid");
+        Check(BulkDelete.Matches("foo.test.local", "*.test.local")
+            && !BulkDelete.Matches("foo.other.com", "*.test.local"), "bulk delete: wildcard match");
+
+        // 批量删除执行：作用域（全部项目 / 当前项目）与仅删除命中规则。
+        var dev = new EnvProject
+        {
+            Name = "Dev",
+            Enabled = true,
+            Rules = new List<HostRule>
+            {
+                new HostRule { Domain = "api.example.com", Target = "127.0.0.1:8080", Enabled = true },
+                new HostRule { Domain = "foo.test.local", Target = "10.0.0.5", Enabled = true },
+                new HostRule { Domain = "keep.example.com", Target = "1.2.3.4", Enabled = true }
+            }
+        };
+        var prod = new EnvProject
+        {
+            Name = "Prod",
+            Enabled = false,
+            Rules = new List<HostRule>
+            {
+                new HostRule { Domain = "api.example.com", Target = "192.168.1.9", Enabled = true }
+            }
+        };
+        var delConfig = new WillowConfig { MappingEnabled = true, Projects = new List<EnvProject> { dev, prod } };
+        var scoped = BulkDelete.Remove(delConfig, new[] { "api.example.com" }, dev);
+        Check(scoped.Removed.Count == 1 && dev.Rules.Count == 2 && prod.Rules.Count == 1,
+            "bulk delete: scoped removal affects only current project");
+
+        var all = BulkDelete.Remove(delConfig, new[] { "api.example.com", "*.test.local" }, null);
+        Check(all.Removed.Count == 2 && dev.Rules.Count == 1 && prod.Rules.Count == 0,
+            "bulk delete: all-project removal with wildcard");
+        Check(all.NotFound.Count == 0 && delConfig.Projects[0].Rules[0].Domain == "keep.example.com",
+            "bulk delete: unmatched rules kept");
+
+        var missing = BulkDelete.Remove(delConfig, new[] { "no-such.example.com" }, null);
+        Check(missing.NotFound.Count == 1 && missing.Removed.Count == 0, "bulk delete: missing domain reported");
+
+        var removedProjects = BulkDelete.RemoveProjects(delConfig, new[] { dev, prod });
+        Check(removedProjects == 2 && delConfig.Projects.Count == 0, "bulk delete: multiple projects removed");
+
         Console.WriteLine();
         Console.WriteLine("FAILURES: " + _failures);
         return _failures == 0 ? 0 : 1;
